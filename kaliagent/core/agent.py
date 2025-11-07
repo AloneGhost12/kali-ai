@@ -24,14 +24,18 @@ class KaliAgent:
         
         # Determine which model to use based on API key configuration
         if settings.GOOGLE_API_KEY:
+            # Set environment variable for Gemini
+            os.environ['GOOGLE_API_KEY'] = settings.GOOGLE_API_KEY
             # Use Gemini if Google API key is configured
             self.agent = Agent(
-                model=Gemini(id="gemini-1.5-flash"),
+                model=Gemini(id="gemini-1.5-flash", api_key=settings.GOOGLE_API_KEY),
                 markdown=True,
                 introduction=self._load_agent_prompt()
             )
             self.logger.info("Using Google Gemini model")
         elif settings.OPENAI_API_KEY:
+            # Set environment variable for OpenAI
+            os.environ['OPENAI_API_KEY'] = settings.OPENAI_API_KEY
             # Use OpenAI if configured
             self.agent = Agent(
                 model=OpenAIChat(id=settings.MODEL_ID),
@@ -135,17 +139,25 @@ class KaliAgent:
                 self._handle_command_execution(command, message)
             else:
                 # Process as normal chat - use run() method instead of print_response()
-                response = self.agent.run(message, stream=False)
+                console.print("[dim]Thinking...[/dim]")
                 
-                # Extract and print the response
-                if hasattr(response, 'content'):
-                    response_text = response.content
-                elif hasattr(response, 'messages') and response.messages:
-                    response_text = response.messages[-1].content
-                else:
-                    response_text = str(response)
-                
-                console.print(Markdown(response_text))
+                try:
+                    response = self.agent.run(message, stream=False)
+                    
+                    # Extract and print the response
+                    if hasattr(response, 'content'):
+                        response_text = response.content
+                    elif hasattr(response, 'messages') and response.messages:
+                        response_text = response.messages[-1].content
+                    else:
+                        response_text = str(response)
+                    
+                    console.print(Markdown(response_text))
+                except TimeoutError:
+                    console.print("[red]Request timed out. Please try again.[/red]")
+                except Exception as api_error:
+                    console.print(f"[red]API Error: {str(api_error)}[/red]")
+                    self.logger.error(f"API call failed: {str(api_error)}")
                 
         except Exception as e:
             self.logger.error(f"Error during chat: {str(e)}")
