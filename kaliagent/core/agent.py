@@ -134,9 +134,18 @@ class KaliAgent:
                 # Process as command execution request
                 self._handle_command_execution(command, message)
             else:
-                # Process as normal chat - agno Agent uses print_response()
-                # which prints directly to console
-                self.agent.print_response(message, markdown=True)
+                # Process as normal chat - use run() method instead of print_response()
+                response = self.agent.run(message, stream=False)
+                
+                # Extract and print the response
+                if hasattr(response, 'content'):
+                    response_text = response.content
+                elif hasattr(response, 'messages') and response.messages:
+                    response_text = response.messages[-1].content
+                else:
+                    response_text = str(response)
+                
+                console.print(Markdown(response_text))
                 
         except Exception as e:
             self.logger.error(f"Error during chat: {str(e)}")
@@ -275,10 +284,16 @@ class KaliAgent:
         Command: {command}
         """
         
-        # For now, return the prompt as we need to use print_response
-        # which doesn't return text
-        # TODO: Use a method that returns text
-        self.agent.print_response(prompt, markdown=True, stream=False)
+        # Use run() method instead of print_response
+        response = self.agent.run(prompt, stream=False)
+        if hasattr(response, 'content'):
+            response_text = response.content
+        elif hasattr(response, 'messages') and response.messages:
+            response_text = response.messages[-1].content
+        else:
+            response_text = str(response)
+        
+        console.print(Markdown(response_text))
         return ""
     
     def _get_result_interpretation(self, command: str, output: str) -> str:
@@ -297,9 +312,16 @@ class KaliAgent:
         3. Recommended next steps
         """
         
-        # For now, use print_response
-        # TODO: Use a method that returns text
-        self.agent.print_response(prompt, markdown=True, stream=False)
+        # Use run() method instead of print_response
+        response = self.agent.run(prompt, stream=False)
+        if hasattr(response, 'content'):
+            response_text = response.content
+        elif hasattr(response, 'messages') and response.messages:
+            response_text = response.messages[-1].content
+        else:
+            response_text = str(response)
+        
+        console.print(Markdown(response_text))
         return ""
     
     def _save_interaction(self, message: str, response: str):
