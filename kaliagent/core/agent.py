@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Any, Tuple
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from agno.models.google import Gemini
 from ..config.settings import settings
 from rich.console import Console
 from rich.markdown import Markdown
@@ -20,11 +21,27 @@ class KaliAgent:
     def __init__(self):
         """Initialize the Kali Linux Ethical Hacking Assistant"""
         self._setup_logging()
-        self.agent = Agent(
-            model=OpenAIChat(id=settings.MODEL_ID),
-            markdown=True,
-            introduction=self._load_agent_prompt()
-        )
+        
+        # Determine which model to use based on API key configuration
+        if settings.GOOGLE_API_KEY:
+            # Use Gemini if Google API key is configured
+            self.agent = Agent(
+                model=Gemini(id="gemini-2.0-flash-exp"),
+                markdown=True,
+                introduction=self._load_agent_prompt()
+            )
+            self.logger.info("Using Google Gemini model")
+        elif settings.OPENAI_API_KEY:
+            # Use OpenAI if configured
+            self.agent = Agent(
+                model=OpenAIChat(id=settings.MODEL_ID),
+                markdown=True,
+                introduction=self._load_agent_prompt()
+            )
+            self.logger.info(f"Using OpenAI model: {settings.MODEL_ID}")
+        else:
+            raise ValueError("No API key configured. Please run 'kaliagent configure' to set up your API key.")
+        
         self.logger.info(f"{settings.APP_NAME} initialized successfully")
         self.history = []
     

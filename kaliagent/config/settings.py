@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     
     # API Configuration
     OPENAI_API_KEY: Optional[str] = None
+    GOOGLE_API_KEY: Optional[str] = None  # For Gemini
     MODEL_ID: str = "gpt-3.5-turbo"  # Changed from gpt-4 to reduce costs
     
     # Application Settings
@@ -60,6 +61,11 @@ class Settings(BaseSettings):
             if api_key and isinstance(api_key, str):
                 self.OPENAI_API_KEY = api_key
                 os.environ['OPENAI_API_KEY'] = api_key
+            
+            google_key = config_mgr.get('GOOGLE_API_KEY')
+            if google_key and isinstance(google_key, str):
+                self.GOOGLE_API_KEY = google_key
+                os.environ['GOOGLE_API_KEY'] = google_key
             
             model_id = config_mgr.get('MODEL_ID')
             if model_id and isinstance(model_id, str):

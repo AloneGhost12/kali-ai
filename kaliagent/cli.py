@@ -17,22 +17,30 @@ def cli():
     pass
 
 @cli.command()
-@click.option('--api-key', help='OpenAI API key')
+@click.option('--api-key', help='API key (OpenAI or Google)')
+@click.option('--provider', type=click.Choice(['openai', 'gemini'], case_sensitive=False), help='API provider (openai or gemini)')
 @click.option('--safe-mode/--no-safe-mode', default=None, help='Enable/disable safe mode (no command execution)')
 @click.option('--confirm/--no-confirm', default=None, help='Require confirmation before executing commands')
-@click.option('--model', help='OpenAI model to use (e.g., gpt-3.5-turbo, gpt-4)')
+@click.option('--model', help='Model to use (e.g., gpt-3.5-turbo, gpt-4, gemini-2.0-flash-exp)')
 @click.option('--show', is_flag=True, help='Show current configuration')
-def configure(api_key, safe_mode, confirm, model, show):
+def configure(api_key, provider, safe_mode, confirm, model, show):
     """Configure KaliAI settings"""
     
     if show:
         # Show current configuration
         console.print("\n[bold cyan]Current Configuration:[/bold cyan]\n")
         
-        # API Key (masked)
-        current_api_key = config_manager.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
-        if current_api_key:
-            masked_key = current_api_key[:10] + '...' + current_api_key[-4:] if len(current_api_key) > 14 else '***'
+        # Check which provider is configured
+        openai_key = config_manager.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
+        google_key = config_manager.get('GOOGLE_API_KEY') or os.getenv('GOOGLE_API_KEY')
+        
+        if google_key:
+            masked_key = google_key[:10] + '...' + google_key[-4:] if len(google_key) > 14 else '***'
+            console.print(f"[bold]Provider:[/bold] Google Gemini")
+            console.print(f"[bold]API Key:[/bold] {masked_key}")
+        elif openai_key:
+            masked_key = openai_key[:10] + '...' + openai_key[-4:] if len(openai_key) > 14 else '***'
+            console.print(f"[bold]Provider:[/bold] OpenAI")
             console.print(f"[bold]API Key:[/bold] {masked_key}")
         else:
             console.print("[bold]API Key:[/bold] [red]Not configured[/red]")
@@ -56,9 +64,14 @@ def configure(api_key, safe_mode, confirm, model, show):
     
     # Update API key
     if api_key:
-        config_manager.set('OPENAI_API_KEY', api_key)
-        os.environ['OPENAI_API_KEY'] = api_key
-        console.print("[green]✓ API key configured successfully[/green]")
+        if provider == 'gemini':
+            config_manager.set('GOOGLE_API_KEY', api_key)
+            os.environ['GOOGLE_API_KEY'] = api_key
+            console.print("[green]✓ Google Gemini API key configured successfully[/green]")
+        else:
+            config_manager.set('OPENAI_API_KEY', api_key)
+            os.environ['OPENAI_API_KEY'] = api_key
+            console.print("[green]✓ OpenAI API key configured successfully[/green]")
     
     # Update model
     if model:
@@ -79,7 +92,7 @@ def configure(api_key, safe_mode, confirm, model, show):
         console.print(f"[green]✓ Command confirmation: {status}[/green]")
     
     # If no options provided, show help
-    if not any([api_key, safe_mode is not None, confirm is not None, model]):
+    if not any([api_key, safe_mode is not None, confirm is not None, model, provider]):
         console.print("[yellow]No configuration changes specified.[/yellow]")
         console.print("[italic]Use 'kaliagent configure --show' to see current settings[/italic]")
         console.print("[italic]Use 'kaliagent configure --help' for options[/italic]")
@@ -90,25 +103,33 @@ def interactive():
     try:
         # Load API key from config or environment
         api_key = config_manager.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
+        google_key = config_manager.get('GOOGLE_API_KEY') or os.getenv('GOOGLE_API_KEY')
         
-        if not api_key:
-            console.print("[red]Error: OpenAI API key not found.[/red]")
-            console.print("[yellow]Use 'kaliagent configure --api-key YOUR_KEY' to set it.[/yellow]")
+        if not api_key and not google_key:
+            console.print("[red]Error: No API key found.[/red]")
+            console.print("[yellow]Use 'kaliagent configure --api-key YOUR_KEY --provider [openai|gemini]' to set it.[/yellow]")
             sys.exit(1)
         
-        # Set environment variable for the session
-        os.environ['OPENAI_API_KEY'] = api_key
+        # Set environment variables for the session
+        if google_key:
+            os.environ['GOOGLE_API_KEY'] = google_key
+        if api_key:
+            os.environ['OPENAI_API_KEY'] = api_key
         
         # Load other settings from config
-        if config_manager.get('MODEL_ID'):
-            settings.MODEL_ID = config_manager.get('MODEL_ID')
-        if config_manager.get('SAFE_MODE') is not None:
-            settings.SAFE_MODE = config_manager.get('SAFE_MODE')
-        if config_manager.get('REQUIRE_CONFIRMATION') is not None:
-            settings.REQUIRE_CONFIRMATION = config_manager.get('REQUIRE_CONFIRMATION')
+        model_id = config_manager.get('MODEL_ID')
+        if model_id:
+            settings.MODEL_ID = model_id
+        safe_mode = config_manager.get('SAFE_MODE')
+        if safe_mode is not None:
+            settings.SAFE_MODE = safe_mode
+        require_conf = config_manager.get('REQUIRE_CONFIRMATION')
+        if require_conf is not None:
+            settings.REQUIRE_CONFIRMATION = require_conf
             
+        provider = "Google Gemini" if google_key else f"OpenAI ({settings.MODEL_ID})"
         console.print("[bold blue]KaliAI - Ethical Hacking Assistant[/bold blue]")
-        console.print(f"[italic]Model: {settings.MODEL_ID} | Safe Mode: {'ON' if settings.SAFE_MODE else 'OFF'}[/italic]")
+        console.print(f"[italic]Model: {provider} | Safe Mode: {'ON' if settings.SAFE_MODE else 'OFF'}[/italic]")
         console.print("[italic]Type 'exit' to quit[/italic]\n")
         
         agent = KaliAgent()
