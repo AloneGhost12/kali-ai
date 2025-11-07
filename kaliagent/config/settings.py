@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     
     # API Configuration
     OPENAI_API_KEY: Optional[str] = None
-    MODEL_ID: str = "gpt-4"
+    MODEL_ID: str = "gpt-3.5-turbo"  # Changed from gpt-4 to reduce costs
     
     # Application Settings
     APP_NAME: str = "KaliAI"

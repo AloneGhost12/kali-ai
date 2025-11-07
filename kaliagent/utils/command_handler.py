@@ -1,5 +1,6 @@
 import subprocess
 import shlex
+import shutil
 from typing import Dict, Tuple, List, Optional
 from pathlib import Path
 import logging
@@ -8,14 +9,13 @@ from ..config.settings import settings
 logger = logging.getLogger("kaliagent.commands")
 
 def check_tool_installed(tool_name: str) -> bool:
-    """Check if a security tool is installed on the system"""
+    """Check if a security tool is installed on the system
+    
+    Uses shutil.which() for cross-platform compatibility (Windows/Linux/Mac)
+    """
     try:
-        result = subprocess.run(
-            ["which", tool_name],
-            capture_output=True,
-            text=True
-        )
-        return result.returncode == 0
+        # shutil.which() is cross-platform and returns None if not found
+        return shutil.which(tool_name) is not None
     except Exception as e:
         logger.error(f"Error checking tool installation: {str(e)}")
         return False
@@ -70,12 +70,25 @@ def execute_command(command: str) -> Dict:
         }
     
     try:
-        # Execute the command
+        # Parse command securely
+        try:
+            cmd_args = shlex.split(command)
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": f"Invalid command syntax: {str(e)}",
+                "stdout": "",
+                "stderr": "",
+                "returncode": -1
+            }
+        
+        # Execute the command with shell=False for security
         process = subprocess.run(
-            command,
-            shell=True,  # Using shell=True because we need to execute with flags
+            cmd_args,
+            shell=False,  # Security: Never use shell=True with user input
             capture_output=True,
-            text=True
+            text=True,
+            timeout=300  # 5 minute timeout
         )
         
         return {
@@ -86,6 +99,24 @@ def execute_command(command: str) -> Dict:
             "command": command
         }
         
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "error": "Command execution timed out (5 minute limit)",
+            "stdout": "",
+            "stderr": "Timeout",
+            "returncode": -1,
+            "command": command
+        }
+    except FileNotFoundError:
+        return {
+            "success": False,
+            "error": f"Command not found: {cmd_args[0] if cmd_args else 'unknown'}",
+            "stdout": "",
+            "stderr": "Command not found",
+            "returncode": -1,
+            "command": command
+        }
     except Exception as e:
         logger.error(f"Error executing command: {str(e)}")
         return {

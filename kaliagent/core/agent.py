@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from ..config.settings import settings
@@ -33,23 +33,25 @@ class KaliAgent:
         self.logger = logging.getLogger("kaliagent")
         self.logger.setLevel(settings.LOG_LEVEL)
         
-        # File handler
-        fh = logging.FileHandler(settings.LOG_DIR / "kaliagent.log")
-        fh.setLevel(settings.LOG_LEVEL)
-        
-        # Console handler
-        ch = logging.StreamHandler()
-        ch.setLevel(settings.LOG_LEVEL)
-        
-        # Formatter
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        fh.setFormatter(formatter)
-        ch.setFormatter(formatter)
-        
-        self.logger.addHandler(fh)
-        self.logger.addHandler(ch)
+        # Only add handlers if they don't already exist
+        if not self.logger.handlers:
+            # File handler
+            fh = logging.FileHandler(settings.LOG_DIR / "kaliagent.log")
+            fh.setLevel(settings.LOG_LEVEL)
+            
+            # Console handler
+            ch = logging.StreamHandler()
+            ch.setLevel(settings.LOG_LEVEL)
+            
+            # Formatter
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            fh.setFormatter(formatter)
+            ch.setFormatter(formatter)
+            
+            self.logger.addHandler(fh)
+            self.logger.addHandler(ch)
     
     def _load_agent_prompt(self) -> str:
         """Load the agent's system prompt"""
@@ -126,7 +128,7 @@ class KaliAgent:
             self.logger.error(f"Error during chat: {str(e)}")
             console.print(f"[red]Error: {str(e)}[/red]")
     
-    def _is_command_request(self, message: str) -> tuple[bool, Optional[str]]:
+    def _is_command_request(self, message: str) -> Tuple[bool, Optional[str]]:
         """Determine if the message is requesting command execution"""
         # Common command execution indicators
         indicators = [
@@ -188,11 +190,20 @@ class KaliAgent:
         if not settings.SAFE_MODE:
             try:
                 console.print("\n[bold]Executing command...[/bold]")
+                
+                # Security: Use shell=False and parse command to prevent injection
+                try:
+                    cmd_args = shlex.split(command)
+                except ValueError as e:
+                    console.print(f"[red]Invalid command syntax: {str(e)}[/red]")
+                    return
+                
                 result = subprocess.run(
-                    command, 
-                    shell=True, 
+                    cmd_args, 
+                    shell=False,  # Security: Never use shell=True with user input
                     capture_output=True, 
-                    text=True
+                    text=True,
+                    timeout=300  # 5 minute timeout to prevent hanging
                 )
                 
                 if result.returncode == 0:
@@ -212,6 +223,11 @@ class KaliAgent:
                 # Save to history
                 self._save_command_execution(original_message, command, result.stdout, result.stderr)
                 
+            except subprocess.TimeoutExpired:
+                console.print("[red]Command execution timed out (5 minute limit)[/red]")
+            except FileNotFoundError:
+                console.print(f"[red]Command not found: {cmd_args[0]}[/red]")
+                console.print("[yellow]Make sure the tool is installed and in your PATH[/yellow]")
             except Exception as e:
                 self.logger.error(f"Error executing command: {str(e)}")
                 console.print(f"[red]Error executing command: {str(e)}[/red]")
@@ -221,8 +237,18 @@ class KaliAgent:
     
     def _validate_security_command(self, command: str) -> bool:
         """Validate if the command is related to security tools"""
+        if not command or not command.strip():
+            return False
+            
         # Extract the base command (first word)
-        base_cmd = shlex.split(command)[0] if command else ""
+        try:
+            args = shlex.split(command)
+            if not args:
+                return False
+            base_cmd = args[0]
+        except ValueError:
+            # Invalid command syntax
+            return False
         
         # Check if it's in our allowed tools list
         return base_cmd in settings.ALLOWED_TOOLS
@@ -261,36 +287,48 @@ class KaliAgent:
     
     def _save_interaction(self, message: str, response: str):
         """Save interaction to history"""
-        timestamp = datetime.now().isoformat()
-        interaction = {
-            "timestamp": timestamp,
-            "type": "chat",
-            "user_message": message,
-            "agent_response": response
-        }
-        
-        self.history.append(interaction)
-        
-        # Save to file
-        history_file = settings.HISTORY_DIR / f"chat_{timestamp}.json"
-        with open(history_file, 'w') as f:
-            json.dump(interaction, f, indent=2)
+        try:
+            timestamp = datetime.now().isoformat()
+            interaction = {
+                "timestamp": timestamp,
+                "type": "chat",
+                "user_message": message,
+                "agent_response": response
+            }
+            
+            self.history.append(interaction)
+            
+            # Save to file with error handling
+            try:
+                history_file = settings.HISTORY_DIR / f"chat_{timestamp.replace(':', '-')}.json"
+                with open(history_file, 'w', encoding='utf-8') as f:
+                    json.dump(interaction, f, indent=2)
+            except IOError as e:
+                self.logger.error(f"Failed to save interaction to file: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Error saving interaction: {str(e)}")
     
     def _save_command_execution(self, message: str, command: str, output: str, error: str):
         """Save command execution to history"""
-        timestamp = datetime.now().isoformat()
-        interaction = {
-            "timestamp": timestamp,
-            "type": "command",
-            "user_message": message,
-            "command": command,
-            "output": output,
-            "error": error
-        }
-        
-        self.history.append(interaction)
-        
-        # Save to file
-        history_file = settings.HISTORY_DIR / f"command_{timestamp}.json"
-        with open(history_file, 'w') as f:
-            json.dump(interaction, f, indent=2)
+        try:
+            timestamp = datetime.now().isoformat()
+            interaction = {
+                "timestamp": timestamp,
+                "type": "command",
+                "user_message": message,
+                "command": command,
+                "output": output,
+                "error": error
+            }
+            
+            self.history.append(interaction)
+            
+            # Save to file with error handling
+            try:
+                history_file = settings.HISTORY_DIR / f"command_{timestamp.replace(':', '-')}.json"
+                with open(history_file, 'w', encoding='utf-8') as f:
+                    json.dump(interaction, f, indent=2)
+            except IOError as e:
+                self.logger.error(f"Failed to save command execution to file: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Error saving command execution: {str(e)}")
