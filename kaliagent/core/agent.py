@@ -117,12 +117,19 @@ class KaliAgent:
                 # Process as command execution request
                 self._handle_command_execution(command, message)
             else:
-                # Process as normal chat
-                response = self.agent.chat(message)
-                console.print(Markdown(response))
+                # Process as normal chat using run_response method
+                response = self.agent.run_response(message)
+                
+                # Extract text from response
+                if hasattr(response, 'content'):
+                    response_text = response.content
+                else:
+                    response_text = str(response)
+                
+                console.print(Markdown(response_text))
                 
                 # Save to history
-                self._save_interaction(message, response)
+                self._save_interaction(message, response_text)
                 
         except Exception as e:
             self.logger.error(f"Error during chat: {str(e)}")
@@ -153,13 +160,14 @@ class KaliAgent:
             Reply with only the command or 'not a command'.
             """
             
-            response = self.agent.chat(prompt)
+            response = self.agent.run_response(prompt)
+            response_text = response.content if hasattr(response, 'content') else str(response)
             
-            if response.lower().strip() == "not a command":
+            if response_text.lower().strip() == "not a command":
                 return False, None
             else:
                 # Extract the command from the response
-                return True, response.strip()
+                return True, response_text.strip()
         
         return False, None
     
