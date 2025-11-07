@@ -64,11 +64,22 @@ def configure(api_key, provider, safe_mode, confirm, model, show):
     
     # Update API key
     if api_key:
+        # Auto-detect provider if not specified
+        if provider is None:
+            if api_key.startswith('AIza'):
+                provider = 'gemini'
+            elif api_key.startswith('sk-'):
+                provider = 'openai'
+        
         if provider == 'gemini':
+            # Clear OpenAI key if switching to Gemini
+            config_manager.delete('OPENAI_API_KEY')
             config_manager.set('GOOGLE_API_KEY', api_key)
             os.environ['GOOGLE_API_KEY'] = api_key
             console.print("[green]✓ Google Gemini API key configured successfully[/green]")
         else:
+            # Clear Gemini key if switching to OpenAI
+            config_manager.delete('GOOGLE_API_KEY')
             config_manager.set('OPENAI_API_KEY', api_key)
             os.environ['OPENAI_API_KEY'] = api_key
             console.print("[green]✓ OpenAI API key configured successfully[/green]")
