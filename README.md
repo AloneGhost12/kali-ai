@@ -2,6 +2,8 @@
 
 AI-powered Ethical Hacking Assistant for Kali Linux
 
+**Version 2.0** - Now with Command Templates, Playbooks, and Target Validation!
+
 KaliAI is an advanced AI assistant designed to help security professionals and ethical hackers leverage Kali Linux tools effectively and safely. It provides guidance, explanations, and security insights while emphasizing ethical considerations and best practices.
 
 │     |   < | | | | | |/ ___ \  | |  │
@@ -26,6 +28,28 @@ Choose an option [1/2/3/4]:
 
 
 ## Features
+
+### 🆕 New in Version 2.0
+
+#### 1. Command Templates Library
+- **15+ Pre-built Templates** for common security testing scenarios
+- **7 Categories**: Reconnaissance, Web Application, Database, Password Attacks, Wireless, Sniffing, Exploitation
+- **Risk Level Indicators** to help you understand impact
+- **Parameter Guidance** with examples and best practices
+
+#### 2. Playbook System
+- **Save & Replay** multi-step testing workflows
+- **Interactive Execution** with step-by-step prompts
+- **Built-in Playbooks** for web app pentesting and network reconnaissance
+- **Export to Markdown** for professional reports
+
+#### 3. Target Validation
+- **DNS Resolution** and hostname validation
+- **Reachability Checks** before scanning
+- **Private/Public IP Detection**
+- **Scope Confirmation** to prevent accidents
+
+### Core Features
 
 ### 1. Expert Guidance
 - Detailed explanations of Kali Linux tools
@@ -72,6 +96,42 @@ kaliagent configure --api-key your-api-key-here
 ```
 
 ## Usage
+
+### Quick Start with Templates
+
+```bash
+# List available command templates
+kaliagent templates list
+
+# Show template details
+kaliagent templates show web-scan-basic
+
+# Use a template
+kaliagent templates use port-scan-basic -p target=192.168.1.10 --execute
+```
+
+### Playbook Workflows
+
+```bash
+# List available playbooks
+kaliagent playbooks list
+
+# Execute a playbook interactively
+kaliagent playbooks execute web_application_pentest.json
+
+# Create your own playbook
+kaliagent playbooks create
+```
+
+### Target Validation
+
+```bash
+# Validate a target before scanning
+kaliagent validate example.com
+
+# Validate a network range
+kaliagent validate 192.168.1.0/24 --network
+```
 
 ### Interactive Mode
 Start an interactive session with KaliAI:
@@ -125,6 +185,12 @@ KaliAI is designed to promote ethical hacking practices:
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+## Documentation
+
+- **[New Features Guide](NEW_FEATURES.md)** - Detailed guide for v2.0 features
+- **[Security Fixes](SECURITY_FIXES.md)** - Security improvements documentation
+- **[Changelog](CHANGELOG.md)** - Version history and changes
 
 ## License
 

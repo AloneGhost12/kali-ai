@@ -1,7 +1,9 @@
 import click
 from rich.console import Console
+from rich.prompt import Prompt
 from .core.agent import KaliAgent
 from .config.settings import settings
+from .templates import TemplateManager
 import os
 import sys
 
@@ -94,6 +96,118 @@ def analyze(command):
         
         # Process through the agent
         agent.chat(prompt)
+        
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        sys.exit(1)
+
+@cli.group()
+def templates():
+    """Manage command templates"""
+    pass
+
+@templates.command('list')
+@click.option('--category', '-c', help='Filter by category')
+def list_templates(category):
+    """List available command templates"""
+    try:
+        manager = TemplateManager()
+        
+        if category:
+            console.print(f"\n[bold]Templates in category: {category}[/bold]\n")
+        else:
+            console.print("\n[bold]All Available Templates[/bold]\n")
+            console.print("[italic]Use --category to filter by specific category[/italic]\n")
+        
+        manager.display_templates(category)
+        
+        console.print(f"\n[bold]Categories:[/bold] {', '.join(manager.get_categories())}")
+        console.print("\n[italic]Use 'kaliagent templates show <name>' for details[/italic]")
+        
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        sys.exit(1)
+
+@templates.command('show')
+@click.argument('name', type=str)
+def show_template(name):
+    """Show detailed information about a template"""
+    try:
+        manager = TemplateManager()
+        manager.display_template_details(name)
+        
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        sys.exit(1)
+
+@templates.command('use')
+@click.argument('name', type=str)
+@click.option('--params', '-p', multiple=True, help='Parameters in format key=value')
+@click.option('--execute', '-e', is_flag=True, help='Execute the command (respects safe mode)')
+def use_template(name, params, execute):
+    """Use a command template"""
+    try:
+        manager = TemplateManager()
+        template = manager.get_template(name)
+        
+        if not template:
+            console.print(f"[red]Template '{name}' not found.[/red]")
+            console.print("[yellow]Use 'kaliagent templates list' to see available templates[/yellow]")
+            sys.exit(1)
+        
+        # Show template details
+        manager.display_template_details(name)
+        
+        # Parse parameters
+        param_dict = {}
+        for param in params:
+            if '=' not in param:
+                console.print(f"[red]Invalid parameter format: {param}[/red]")
+                console.print("[yellow]Use format: key=value[/yellow]")
+                sys.exit(1)
+            key, value = param.split('=', 1)
+            param_dict[key] = value
+        
+        # Check if all required parameters are provided
+        missing_params = set(template.parameters.keys()) - set(param_dict.keys())
+        if missing_params:
+            console.print(f"\n[yellow]Missing required parameters:[/yellow]")
+            for param in missing_params:
+                console.print(f"  • {param}: {template.parameters[param]}")
+            console.print(f"\n[italic]Example: kaliagent templates use {name} -p param1=value1 -p param2=value2[/italic]")
+            sys.exit(1)
+        
+        # Generate command
+        command = manager.generate_command(name, param_dict)
+        
+        console.print(f"\n[bold green]Generated Command:[/bold green]")
+        console.print(f"[cyan]{command}[/cyan]")
+        
+        # Execute if requested
+        if execute:
+            console.print(f"\n[yellow]Executing command...[/yellow]")
+            agent = KaliAgent()
+            agent.chat(f"Execute this command: {command}")
+        else:
+            console.print(f"\n[yellow]Command not executed. Use --execute flag to run it.[/yellow]")
+        
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        sys.exit(1)
+
+@templates.command('categories')
+def list_categories():
+    """List all template categories"""
+    try:
+        manager = TemplateManager()
+        categories = manager.get_categories()
+        
+        console.print("\n[bold]Template Categories:[/bold]\n")
+        for cat in categories:
+            count = len(manager.list_templates(cat))
+            console.print(f"  • [cyan]{cat}[/cyan] ({count} templates)")
+        
+        console.print(f"\n[italic]Use 'kaliagent templates list --category <name>' to filter[/italic]")
         
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
