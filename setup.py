@@ -7,7 +7,7 @@ setup(
     install_requires=[
         'agno>=1.2.3',
         'openai>=1.0.0',
-        'google-generativeai>=0.3.0',
+        'google-genai>=0.3.0',
         'python-dotenv>=1.0.0',
         'rich>=13.0.0',
         'pydantic>=2.0.0',
