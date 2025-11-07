@@ -26,7 +26,7 @@ class KaliAgent:
         if settings.GOOGLE_API_KEY:
             # Use Gemini if Google API key is configured
             self.agent = Agent(
-                model=Gemini(id="gemini-2.0-flash-exp"),
+                model=Gemini(id="gemini-1.5-flash"),
                 markdown=True,
                 introduction=self._load_agent_prompt()
             )
