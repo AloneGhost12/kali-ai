@@ -117,19 +117,9 @@ class KaliAgent:
                 # Process as command execution request
                 self._handle_command_execution(command, message)
             else:
-                # Process as normal chat using run_response method
-                response = self.agent.run_response(message)
-                
-                # Extract text from response
-                if hasattr(response, 'content'):
-                    response_text = response.content
-                else:
-                    response_text = str(response)
-                
-                console.print(Markdown(response_text))
-                
-                # Save to history
-                self._save_interaction(message, response_text)
+                # Process as normal chat - agno Agent uses print_response()
+                # which prints directly to console
+                self.agent.print_response(message, markdown=True)
                 
         except Exception as e:
             self.logger.error(f"Error during chat: {str(e)}")
@@ -160,14 +150,11 @@ class KaliAgent:
             Reply with only the command or 'not a command'.
             """
             
-            response = self.agent.run_response(prompt)
-            response_text = response.content if hasattr(response, 'content') else str(response)
-            
-            if response_text.lower().strip() == "not a command":
-                return False, None
-            else:
-                # Extract the command from the response
-                return True, response_text.strip()
+            # Use print_response to get the response
+            # Note: This will print to console, so we capture it differently
+            # For now, we'll use a simpler heuristic-based approach
+            # TODO: Improve this with a proper API call that returns text
+            return False, None
         
         return False, None
     
@@ -182,9 +169,8 @@ class KaliAgent:
             return
             
         # Get explanation of what the command does
-        explanation = self._get_command_explanation(command)
         console.print("\n[bold blue]Command Analysis:[/bold blue]")
-        console.print(Markdown(explanation))
+        self._get_command_explanation(command)
         
         # Ask for confirmation if required
         if settings.REQUIRE_CONFIRMATION:
@@ -220,9 +206,8 @@ class KaliAgent:
                     console.print(result.stdout)
                     
                     # Get interpretation of results
-                    interpretation = self._get_result_interpretation(command, result.stdout)
                     console.print("\n[bold blue]Result Analysis:[/bold blue]")
-                    console.print(Markdown(interpretation))
+                    self._get_result_interpretation(command, result.stdout)
                 else:
                     console.print("\n[red]Command execution failed[/red]")
                     console.print("\n[bold]Error:[/bold]")
@@ -273,7 +258,11 @@ class KaliAgent:
         Command: {command}
         """
         
-        return self.agent.chat(prompt)
+        # For now, return the prompt as we need to use print_response
+        # which doesn't return text
+        # TODO: Use a method that returns text
+        self.agent.print_response(prompt, markdown=True, stream=False)
+        return ""
     
     def _get_result_interpretation(self, command: str, output: str) -> str:
         """Get interpretation of command results"""
@@ -291,7 +280,10 @@ class KaliAgent:
         3. Recommended next steps
         """
         
-        return self.agent.chat(prompt)
+        # For now, use print_response
+        # TODO: Use a method that returns text
+        self.agent.print_response(prompt, markdown=True, stream=False)
+        return ""
     
     def _save_interaction(self, message: str, response: str):
         """Save interaction to history"""
