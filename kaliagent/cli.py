@@ -3,11 +3,13 @@ from rich.console import Console
 from rich.prompt import Prompt
 from .core.agent import KaliAgent
 from .config.settings import settings
+from .config.config_manager import ConfigManager
 from .templates import TemplateManager
 import os
 import sys
 
 console = Console()
+config_manager = ConfigManager()
 
 @click.group()
 def cli():
@@ -16,30 +18,97 @@ def cli():
 
 @cli.command()
 @click.option('--api-key', help='OpenAI API key')
-@click.option('--safe-mode/--no-safe-mode', default=True, help='Enable/disable safe mode (no command execution)')
-@click.option('--confirm/--no-confirm', default=True, help='Require confirmation before executing commands')
-def configure(api_key, safe_mode, confirm):
+@click.option('--safe-mode/--no-safe-mode', default=None, help='Enable/disable safe mode (no command execution)')
+@click.option('--confirm/--no-confirm', default=None, help='Require confirmation before executing commands')
+@click.option('--model', help='OpenAI model to use (e.g., gpt-3.5-turbo, gpt-4)')
+@click.option('--show', is_flag=True, help='Show current configuration')
+def configure(api_key, safe_mode, confirm, model, show):
     """Configure KaliAI settings"""
+    
+    if show:
+        # Show current configuration
+        console.print("\n[bold cyan]Current Configuration:[/bold cyan]\n")
+        
+        # API Key (masked)
+        current_api_key = config_manager.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
+        if current_api_key:
+            masked_key = current_api_key[:10] + '...' + current_api_key[-4:] if len(current_api_key) > 14 else '***'
+            console.print(f"[bold]API Key:[/bold] {masked_key}")
+        else:
+            console.print("[bold]API Key:[/bold] [red]Not configured[/red]")
+        
+        # Model
+        current_model = config_manager.get('MODEL_ID', settings.MODEL_ID)
+        console.print(f"[bold]Model:[/bold] {current_model}")
+        
+        # Safe Mode
+        current_safe_mode = config_manager.get('SAFE_MODE', settings.SAFE_MODE)
+        status = "[green]Enabled[/green]" if current_safe_mode else "[red]Disabled[/red]"
+        console.print(f"[bold]Safe Mode:[/bold] {status}")
+        
+        # Confirmation
+        current_confirm = config_manager.get('REQUIRE_CONFIRMATION', settings.REQUIRE_CONFIRMATION)
+        status = "[green]Required[/green]" if current_confirm else "[yellow]Not Required[/yellow]"
+        console.print(f"[bold]Command Confirmation:[/bold] {status}")
+        
+        console.print(f"\n[italic]Config file: {config_manager.config_file}[/italic]\n")
+        return
+    
+    # Update API key
     if api_key:
+        config_manager.set('OPENAI_API_KEY', api_key)
         os.environ['OPENAI_API_KEY'] = api_key
-        console.print("[green]API key configured successfully[/green]")
+        console.print("[green]✓ API key configured successfully[/green]")
+    
+    # Update model
+    if model:
+        config_manager.set('MODEL_ID', model)
+        console.print(f"[green]✓ Model set to: {model}[/green]")
     
     # Update settings
-    settings.SAFE_MODE = safe_mode
-    settings.REQUIRE_CONFIRMATION = confirm
+    if safe_mode is not None:
+        config_manager.set('SAFE_MODE', safe_mode)
+        settings.SAFE_MODE = safe_mode
+        status = "Enabled" if safe_mode else "Disabled"
+        console.print(f"[green]✓ Safe mode: {status}[/green]")
     
-    console.print(f"[green]Safe mode: {'Enabled' if safe_mode else 'Disabled'}[/green]")
-    console.print(f"[green]Command confirmation: {'Required' if confirm else 'Not required'}[/green]")
+    if confirm is not None:
+        config_manager.set('REQUIRE_CONFIRMATION', confirm)
+        settings.REQUIRE_CONFIRMATION = confirm
+        status = "Required" if confirm else "Not required"
+        console.print(f"[green]✓ Command confirmation: {status}[/green]")
+    
+    # If no options provided, show help
+    if not any([api_key, safe_mode is not None, confirm is not None, model]):
+        console.print("[yellow]No configuration changes specified.[/yellow]")
+        console.print("[italic]Use 'kaliagent configure --show' to see current settings[/italic]")
+        console.print("[italic]Use 'kaliagent configure --help' for options[/italic]")
 
 @cli.command()
 def interactive():
     """Start interactive ethical hacking assistant"""
     try:
-        if not os.getenv('OPENAI_API_KEY'):
-            console.print("[red]Error: OpenAI API key not found. Use 'kaliagent configure --api-key YOUR_KEY' to set it.[/red]")
+        # Load API key from config or environment
+        api_key = config_manager.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
+        
+        if not api_key:
+            console.print("[red]Error: OpenAI API key not found.[/red]")
+            console.print("[yellow]Use 'kaliagent configure --api-key YOUR_KEY' to set it.[/yellow]")
             sys.exit(1)
+        
+        # Set environment variable for the session
+        os.environ['OPENAI_API_KEY'] = api_key
+        
+        # Load other settings from config
+        if config_manager.get('MODEL_ID'):
+            settings.MODEL_ID = config_manager.get('MODEL_ID')
+        if config_manager.get('SAFE_MODE') is not None:
+            settings.SAFE_MODE = config_manager.get('SAFE_MODE')
+        if config_manager.get('REQUIRE_CONFIRMATION') is not None:
+            settings.REQUIRE_CONFIRMATION = config_manager.get('REQUIRE_CONFIRMATION')
             
         console.print("[bold blue]KaliAI - Ethical Hacking Assistant[/bold blue]")
+        console.print(f"[italic]Model: {settings.MODEL_ID} | Safe Mode: {'ON' if settings.SAFE_MODE else 'OFF'}[/italic]")
         console.print("[italic]Type 'exit' to quit[/italic]\n")
         
         agent = KaliAgent()
